@@ -466,7 +466,7 @@ with colR:
 
         # Display table + downloads
         df = to_dataframe(prioritized)
-        st.dataframe(df, use_container_width=True)
+       st.dataframe(df, width="stretch")
 
         csv_bytes = df.to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Download CSV", data=csv_bytes, file_name="prioritized_tasks.csv", mime="text/csv")
