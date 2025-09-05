@@ -262,14 +262,14 @@ Draft Kickstarter update"""
             t.quadrant = new_quad
             def quadrant_to_scores(q: str) -> tuple[float, float]:
             # Representative values; adjust if you like
-        if q == "Q1":  # High Imp, Low Eff
-            return 0.85, 0.25
-        if q == "Q2":  # High Imp, High Eff
-            return 0.85, 0.80
-        if q == "Q3":  # Low Imp, Low Eff
-            return 0.30, 0.25
+            if q == "Q1":  # High Imp, Low Eff
+                return 0.85, 0.25
+            if q == "Q2":  # High Imp, High Eff
+                return 0.85, 0.80
+            if q == "Q3":  # Low Imp, Low Eff
+                return 0.30, 0.25
             # Q4: Low Imp, High Eff
-        return 0.30, 0.80
+            return 0.30, 0.80
        
             # ONE Thing
         if st.radio("ONE Thing (pick at most one)", ["No", "Yes"], index=1 if st.session_state.ONE_THING == tid else 0, key=f"one_{tid}") == "Yes":
