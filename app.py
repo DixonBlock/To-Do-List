@@ -277,6 +277,26 @@ with colR:
     def is_placeholder(s: str) -> bool:
         return s.strip() == PLACEHOLDER
 
+def _safe_sort_items(containers, key: str, direction: str = "horizontal"):
+    """Call streamlit-sortables with styles when supported; otherwise fallback."""
+    try:
+        return _sort_items(
+            containers,
+            multi_containers=True,
+            direction=direction,
+            key=key,
+            styles=QUAD_STYLE,   # newer versions support this
+        )
+    except TypeError:
+        # Older versions don't know 'styles'
+        return _sort_items(
+            containers,
+            multi_containers=True,
+            direction=direction,
+            key=key,
+        )
+
+
     # ---------------- MATRIX TAB ----------------
     with tabs[0]:
         st.write(
