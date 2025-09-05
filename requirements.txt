@@ -1,0 +1,7 @@
+streamlit
+pandas
+numpy
+pydantic
+streamlit-sortables
+streamlit-elements
+notion-client
