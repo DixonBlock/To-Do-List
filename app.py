@@ -228,7 +228,7 @@ with colL:
     raw = st.text_area(
         "Paste or type. Each line becomes a sticky note:",
         height=180,
-        placeholder="Example:\nEmail Anna contract update\nRecord tutorial intro\nBook venue for demo day\nPay VAT invoice\nSketch app icon ideas",
+        placeholder="Type tasks here:\nOne per line.",
         key="dumpbox",
     )
     if st.button("➕ Add to board", type="primary"):
