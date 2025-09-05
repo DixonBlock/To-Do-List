@@ -53,6 +53,8 @@ st.markdown(
   box-shadow: 0 6px 18px rgba(0,0,0,0.08);
   border: 1px solid rgba(0,0,0,0.05);
   font-size: 0.95rem;
+  line-height: 1.25rem;           /* NEW: steadier height */
+  margin-bottom: 10px;             /* NEW: consistent gap between cards */
 }
 
 /* quadrant headings */
@@ -259,6 +261,33 @@ with colR:
 
     tabs = st.tabs(["🔲 Matrix (drag here)", "📜 Priority List & Export"])
 
+    # Style helpers for the matrix containers
+QUAD_STYLE = {
+    "container": {
+        # visible frame:
+        "border": "4px solid #0c2f3b",
+        "borderRadius": "16px",
+        "background": "#0c2f3b0d",   # subtle tint
+        "padding": "10px",
+        "margin": "6px",
+
+        # space for ~3 sticky notes (approx 3* (card + gap))
+        # adjust if you tweak sticky card height
+        "minHeight": "300px",         # ~ 3 * (80–85px + gaps)
+        "boxSizing": "border-box",
+    },
+    "header": {
+        "fontWeight": 700,
+        "padding": "6px 8px 10px 8px",
+        "color": "#0c2f3b",
+    },
+    "item": {
+        # let our .sticky CSS handle visuals; we still keep spacing predictable
+        "marginBottom": "10px",
+    },
+}
+
+
     # ---------------- MATRIX TAB ----------------
     with tabs[0]:
         st.write(
@@ -276,10 +305,9 @@ with colR:
 
         # Build label text for display
         def _lbl(tid: str) -> str:
-            t = st.session_state.tasks[tid]
-            return f"{tid}:: {t.text[:70]}{'...' if len(t.text) > 70 else ''}"
-
-        # --- TOP ROW: Q3 | Urgent(Q3) | Urgent(Q4) | Q4 ---
+            return st.session_state.tasks[tid].text
+       
+         # --- TOP ROW: Q3 | Urgent(Q3) | Urgent(Q4) | Q4 ---
         top_containers = []
 
         # Q3 non-urgent
@@ -319,26 +347,38 @@ with colR:
                 multi_containers=True,
                 direction="horizontal",
                 key="matrix_top_row_vUrgCorners",
+                styles=QUAD_STYLE,
             )
             bot_res = _sort_items(
                 bot_containers,
                 multi_containers=True,
                 direction="horizontal",
                 key="matrix_bot_row_vUrgCorners",
+                styles=QUAD_STYLE,
             )
 
             # Parse the returned structures
             # Top: [Q3, UrgQ3, UrgQ4, Q4]
-            new_Q3_ids   = [s.split("::", 1)[0] for s in top_res[0]["items"]]
-            new_UQ3_ids  = [s.split("::", 1)[0] for s in top_res[1]["items"]]
-            new_UQ4_ids  = [s.split("::", 1)[0] for s in top_res[2]["items"]]
-            new_Q4_ids   = [s.split("::", 1)[0] for s in top_res[3]["items"]]
-            # Bottom: [Q1, UrgQ1, UrgQ2, Q2]
-            new_Q1_ids   = [s.split("::", 1)[0] for s in bot_res[0]["items"]]
-            new_UQ1_ids  = [s.split("::", 1)[0] for s in bot_res[1]["items"]]
-            new_UQ2_ids  = [s.split("::", 1)[0] for s in bot_res[2]["items"]]
-            new_Q2_ids   = [s.split("::", 1)[0] for s in bot_res[3]["items"]]
+           # Look up the tid by matching task text
+            new_Q1_ids = [tid for s in top_res[0]["items"]
+                                for tid,t in st.session_state.tasks.items() if t.text == s]
+            new_Q2_ids = [tid for s in top_res[0]["items"]
+                                for tid,t in st.session_state.tasks.items() if t.text == s]
+            new_Q3_ids = [tid for s in top_res[0]["items"]
+                                for tid,t in st.session_state.tasks.items() if t.text == s]
+            new_Q4_ids = [tid for s in top_res[0]["items"]
+                                for tid,t in st.session_state.tasks.items() if t.text == s]
 
+
+            # Bottom: [Q1, UrgQ1, UrgQ2, Q2]
+               new_Q1_ids = [tid for s in top_res[0]["items"]
+                                for tid,t in st.session_state.tasks.items() if t.text == s]
+                new_Q1_ids = [tid for s in top_res[0]["items"]
+                                for tid,t in st.session_state.tasks.items() if t.text == s]
+                new_Q2_ids = [tid for s in top_res[0]["items"]
+                                for tid,t in st.session_state.tasks.items() if t.text == s]
+                new_Q2_ids = [tid for s in top_res[0]["items"]
+                                for tid,t in st.session_state.tasks.items() if t.text == s]
             # 1) Reset quadrant membership (for non-urgent lists)
             for q in ["Q1","Q2","Q3","Q4"]:
                 st.session_state.lists[q].clear()
