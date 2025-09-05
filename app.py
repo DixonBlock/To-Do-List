@@ -145,6 +145,15 @@ def compute_quadrant(importance: float, effort: float) -> str:
         "Q3" if importance <  0.5 and effort <  0.5 else
         "Q4"
     )
+    
+def quadrant_to_scores(q: str) -> tuple[float, float]:
+    if q == "Q1":  # High Imp, Low Eff
+        return 0.85, 0.25
+    if q == "Q2":  # High Imp, High Eff
+        return 0.85, 0.80
+    if q == "Q3":  # Low Imp, Low Eff
+        return 0.30, 0.25
+    return 0.30, 0.80   # Q4: Low Imp, High Eff
 
 
 # ======= HELPERS ==============================================================
@@ -289,138 +298,160 @@ Draft Kickstarter update"""
 with colR:
     st.markdown("### 3) Board")
 
-    tabs = st.tabs(["🔲 Matrix (Importance × Effort)", "📌 Corkboard (freeform drag)", "📜 Priority List & Export"])
+        tabs = st.tabs(["🔲 Matrix (drag here)", "📜 Priority List & Export"])
 
-       # ---------------- MATRIX TAB ----------------
+         # ---------------- MATRIX TAB ----------------
     with tabs[0]:
-        st.write("Drag notes between quadrants (this **is** the corkboard). "
-                 "Drop into 🔥 Urgent to flag urgency; drop back into a quadrant to unflag.")
+        st.write(
+            "Drag sticky notes between boxes. Each quadrant has its **own** urgent corner:\n"
+            "• Q3 urgent (top-left inside) • Q4 urgent (top-right inside) • Q1 urgent (bottom-left inside) • Q2 urgent (bottom-right inside).\n"
+            "Drop into a quadrant to **unflag** urgent; drop into its adjacent urgent box to **flag** urgent for that quadrant."
+        )
 
-        quad_order = ["Q1", "Q2", "Q3", "Q4"]
         quad_labels = {
-            "Q1": "Q1 • High Importance, Low Effort (Quick Wins)",
-            "Q2": "Q2 • High Importance, High Effort (Projects)",
-            "Q3": "Q3 • Low Importance, Low Effort (Fill-ins)",
-            "Q4": "Q4 • Low Importance, High Effort (Avoid/Delegate)",
+            "Q1": "High Importance • Low Effort",
+            "Q2": "High Importance • High Effort",
+            "Q3": "Low Importance • Low Effort",
+            "Q4": "Low Importance • High Effort",
         }
 
-        # Build 5 containers: Urgent lane + four quadrants.
-        # Each item appears in exactly one container.
-        containers = []
+        # Build label text for display
+        def _lbl(tid: str) -> str:
+            t = st.session_state.tasks[tid]
+            return f"{tid}:: {t.text[:70]}{'...' if len(t.text) > 70 else ''}"
 
-        # 0) Urgent lane (contains all tasks with urgent=True)
-        urgent_items = []
-        for tid, t in st.session_state.tasks.items():
-            if t.urgent:
-                urgent_items.append(f"{tid}:: {t.text[:70]}{'...' if len(t.text) > 70 else ''}")
-        containers.append({"header": "🔥 Urgent (drop here to flag)", "items": urgent_items})
+        # --- TOP ROW: Q3 | Urgent(Q3) | Urgent(Q4) | Q4 ---
+        top_containers = []
 
-        # 1–4) Quadrants (only show non-urgent tasks here)
-        for q in quad_order:
-            display_items = []
-            for tid in st.session_state.lists[q]:
-                t = st.session_state.tasks[tid]
-                if not t.urgent:  # urgent ones are shown in the urgent lane
-                    display_items.append(f"{tid}:: {t.text[:70]}{'...' if len(t.text) > 70 else ''}")
-            containers.append({"header": quad_labels[q], "items": display_items})
+        # Q3 non-urgent
+        q3_items = [_lbl(tid) for tid in st.session_state.lists["Q3"] if not st.session_state.tasks[tid].urgent]
+        # Q3 urgent corner (top-left inside)
+        uq3_items = [_lbl(tid) for tid, t in st.session_state.tasks.items() if t.urgent and t.quadrant == "Q3"]
+
+        # Q4 urgent corner (top-right inside)
+        uq4_items = [_lbl(tid) for tid, t in st.session_state.tasks.items() if t.urgent and t.quadrant == "Q4"]
+        # Q4 non-urgent
+        q4_items = [_lbl(tid) for tid in st.session_state.lists["Q4"] if not st.session_state.tasks[tid].urgent]
+
+        top_containers.append({"header": f"Q3 • {quad_labels['Q3']}", "items": q3_items})
+        top_containers.append({"header": "🔥 Urgent • Q3 corner", "items": uq3_items})
+        top_containers.append({"header": "🔥 Urgent • Q4 corner", "items": uq4_items})
+        top_containers.append({"header": f"Q4 • {quad_labels['Q4']}", "items": q4_items})
+
+        # --- BOTTOM ROW: Q1 | Urgent(Q1) | Urgent(Q2) | Q2 ---
+        bot_containers = []
+
+        q1_items = [_lbl(tid) for tid in st.session_state.lists["Q1"] if not st.session_state.tasks[tid].urgent]
+        uq1_items = [_lbl(tid) for tid, t in st.session_state.tasks.items() if t.urgent and t.quadrant == "Q1"]
+
+        uq2_items = [_lbl(tid) for tid, t in st.session_state.tasks.items() if t.urgent and t.quadrant == "Q2"]
+        q2_items = [_lbl(tid) for tid in st.session_state.lists["Q2"] if not st.session_state.tasks[tid].urgent]
+
+        bot_containers.append({"header": f"Q1 • {quad_labels['Q1']}", "items": q1_items})
+        bot_containers.append({"header": "🔥 Urgent • Q1 corner", "items": uq1_items})
+        bot_containers.append({"header": "🔥 Urgent • Q2 corner", "items": uq2_items})
+        bot_containers.append({"header": f"Q2 • {quad_labels['Q2']}", "items": q2_items})
 
         if HAS_SORTABLES and any(st.session_state.tasks):
-            st.caption("Tip: drag items between the five boxes to update urgency/quadrant.")
-            new_containers = _sort_items(
-                containers,
+            st.caption("Tip: you can drag across rows by dropping into an urgent box first, then into the target row.")
+
+            top_res = _sort_items(
+                top_containers,
                 multi_containers=True,
-                direction="vertical",
-                key="matrix_sortables_v2",
+                direction="horizontal",
+                key="matrix_top_row_vUrgCorners",
+            )
+            bot_res = _sort_items(
+                bot_containers,
+                multi_containers=True,
+                direction="horizontal",
+                key="matrix_bot_row_vUrgCorners",
             )
 
-            # Write back changes:
-            #  - new_containers[0] = Urgent lane
-            #  - new_containers[1..4] = Q1..Q4
-            # 1) First, mark urgent=True for items in urgent lane; do NOT change their quadrant
-            urgent_now = set()
-            for item in new_containers[0]["items"]:
-                tid = item.split("::", 1)[0]
-                urgent_now.add(tid)
-            # 2) Next, rebuild quadrant membership from containers 1..4 and mark urgent=False if moved there
-            for idx, q in enumerate(quad_order, start=1):
-                st.session_state.lists[q].clear()
-                for item in new_containers[idx]["items"]:
-                    tid = item.split("::", 1)[0]
-                    st.session_state.lists[q].append(tid)
-                    # This placement sets the canonical quadrant
-                    t = st.session_state.tasks[tid]
-                    t.quadrant = q
-                    t.urgent = False
-                    # Update importance/effort based on quadrant
-                    imp, eff = quadrant_to_scores(q)
-                    t.importance, t.effort = imp, eff
+            # Parse the returned structures
+            # Top: [Q3, UrgQ3, UrgQ4, Q4]
+            new_Q3_ids   = [s.split("::", 1)[0] for s in top_res[0]["items"]]
+            new_UQ3_ids  = [s.split("::", 1)[0] for s in top_res[1]["items"]]
+            new_UQ4_ids  = [s.split("::", 1)[0] for s in top_res[2]["items"]]
+            new_Q4_ids   = [s.split("::", 1)[0] for s in top_res[3]["items"]]
+            # Bottom: [Q1, UrgQ1, UrgQ2, Q2]
+            new_Q1_ids   = [s.split("::", 1)[0] for s in bot_res[0]["items"]]
+            new_UQ1_ids  = [s.split("::", 1)[0] for s in bot_res[1]["items"]]
+            new_UQ2_ids  = [s.split("::", 1)[0] for s in bot_res[2]["items"]]
+            new_Q2_ids   = [s.split("::", 1)[0] for s in bot_res[3]["items"]]
 
-            # 3) Finally, apply urgency flags AFTER quadrant assignment (so both states are consistent)
-            for tid, t in st.session_state.tasks.items():
-                if tid in urgent_now:
-                    t.urgent = True
-                # If a task is urgent but not present in any quadrant list (e.g., newly added), keep its previous quadrant.
-                # Ensure each task exists in some quadrant list for later tabs:
-                if tid not in urgent_now and all(tid not in st.session_state.lists[q] for q in quad_order):
-                    # Fall back to its current t.quadrant or compute one
-                    q = t.quadrant if t.quadrant in quad_order else compute_quadrant(t.importance, t.effort)
+            # 1) Reset quadrant membership (for non-urgent lists)
+            for q in ["Q1","Q2","Q3","Q4"]:
+                st.session_state.lists[q].clear()
+
+            # 2) Write quadrant lists (non-urgent)
+            for tid in new_Q1_ids:
+                st.session_state.lists["Q1"].append(tid)
+                t = st.session_state.tasks[tid]
+                t.quadrant, t.urgent = "Q1", False
+                t.importance, t.effort = quadrant_to_scores("Q1")
+
+            for tid in new_Q2_ids:
+                st.session_state.lists["Q2"].append(tid)
+                t = st.session_state.tasks[tid]
+                t.quadrant, t.urgent = "Q2", False
+                t.importance, t.effort = quadrant_to_scores("Q2")
+
+            for tid in new_Q3_ids:
+                st.session_state.lists["Q3"].append(tid)
+                t = st.session_state.tasks[tid]
+                t.quadrant, t.urgent = "Q3", False
+                t.importance, t.effort = quadrant_to_scores("Q3")
+
+            for tid in new_Q4_ids:
+                st.session_state.lists["Q4"].append(tid)
+                t = st.session_state.tasks[tid]
+                t.quadrant, t.urgent = "Q4", False
+                t.importance, t.effort = quadrant_to_scores("Q4")
+
+            # 3) Apply urgent flags per-corner (these do NOT live in quadrant lists)
+            for tid in new_UQ1_ids:
+                t = st.session_state.tasks[tid]
+                t.quadrant, t.urgent = "Q1", True
+                t.importance, t.effort = quadrant_to_scores("Q1")
+
+            for tid in new_UQ2_ids:
+                t = st.session_state.tasks[tid]
+                t.quadrant, t.urgent = "Q2", True
+                t.importance, t.effort = quadrant_to_scores("Q2")
+
+            for tid in new_UQ3_ids:
+                t = st.session_state.tasks[tid]
+                t.quadrant, t.urgent = "Q3", True
+                t.importance, t.effort = quadrant_to_scores("Q3")
+
+            for tid in new_UQ4_ids:
+                t = st.session_state.tasks[tid]
+                t.quadrant, t.urgent = "Q4", True
+                t.importance, t.effort = quadrant_to_scores("Q4")
+
+            # 4) Safety: ensure every task ends up either urgent (corner) or in a non-urgent quadrant list
+            placed_ids = set(new_Q1_ids + new_Q2_ids + new_Q3_ids + new_Q4_ids +
+                             new_UQ1_ids + new_UQ2_ids + new_UQ3_ids + new_UQ4_ids)
+            for tid, t in list(st.session_state.tasks.items()):
+                if tid not in placed_ids:
+                    # put it back to its current quadrant as non-urgent
+                    q = t.quadrant if t.quadrant in ("Q1","Q2","Q3","Q4") else "Q2"
+                    t.urgent = False
                     if tid not in st.session_state.lists[q]:
                         st.session_state.lists[q].append(tid)
         else:
-            st.info(
-                "Install `streamlit-sortables` to enable drag. If Cloud couldn't install it, "
-                "you'll still see current assignments below."
-            )
-            c1 = st.container(border=True)
-            c1.markdown("**🔥 Urgent**")
-            for tid, t in st.session_state.tasks.items():
-                if t.urgent:
-                    c1.markdown(sticky_html(t), unsafe_allow_html=True)
-
-            c2, c3 = st.columns(2)
-            c4, c5 = st.columns(2)
-            spots = [c2, c3, c4, c5]
-            for idx, q in enumerate(quad_order):
-                with spots[idx]:
-                    st.markdown(f"**{quad_labels[q]}**")
-                    for tid in st.session_state.lists[q]:
-                        t = st.session_state.tasks[tid]
-                        if not t.urgent:
-                            st.markdown(sticky_html(t), unsafe_allow_html=True)
-
-
-    # ---------------- CORKBOARD TAB ----------------
-    with tabs[1]:
-        if HAS_ELEMENTS and any(st.session_state.tasks):
-            st.caption("Drag and resize sticky notes freely. (Powered by `streamlit-elements`)")
-            # Simple freeform grid (no persistence in this minimal version)
-            with elements("corkboard"):
-                layout = []
-                default_positions = {"Q1": (0, 0), "Q2": (6, 0), "Q3": (0, 8), "Q4": (6, 8)}
-                for i, (tid, t) in enumerate(st.session_state.tasks.items()):
-                    x, y = default_positions.get(t.quadrant, (0, 0))
-                    # Stagger so they don't overlap perfectly
-                    layout.append(dashboard.Item(tid, x + (i % 3) * 2, y + (i % 2) * 2, 6, 4, isResizable=True, isDraggable=True))
-
-                with dashboard.Grid(layout=layout, draggableHandle=None):
-                    for tid, t in st.session_state.tasks.items():
-                        with mui.Paper(
-                            key=tid,
-                            elevation=3,
-                            sx={
-                                "padding": "10px",
-                                "background": "#fff59d",
-                                "borderRadius": "12px",
-                                "border": "1px solid rgba(0,0,0,0.05)",
-                            },
-                        ):
-                            mui.Typography(t.text)
-                            mui.Chip(label=f"Imp {t.importance:.2f}", size="small", sx={"mr": 0.5})
-                            mui.Chip(label=f"Eff {t.effort:.2f}", size="small", sx={"mr": 0.5})
-                            if t.urgent:
-                                mui.Chip(label="URGENT", color="error", size="small")
-        else:
-            st.info("Install `streamlit-elements` (already in requirements) to enable the freeform corkboard.")
+            st.info("Install `streamlit-sortables` to enable drag. You’ll still see the current state below.")
+            cols_top = st.columns([1,1,1,1])
+            with cols_top[0]: st.markdown("**Q3**"); [st.markdown(sticky_html(st.session_state.tasks[i]), unsafe_allow_html=True) for i in st.session_state.lists["Q3"] if not st.session_state.tasks[i].urgent]
+            with cols_top[1]: st.markdown("**🔥 Urgent Q3**"); [st.markdown(sticky_html(t), unsafe_allow_html=True) for i,t in st.session_state.tasks.items() if t.urgent and t.quadrant=="Q3"]
+            with cols_top[2]: st.markdown("**🔥 Urgent Q4**"); [st.markdown(sticky_html(t), unsafe_allow_html=True) for i,t in st.session_state.tasks.items() if t.urgent and t.quadrant=="Q4"]
+            with cols_top[3]: st.markdown("**Q4**"); [st.markdown(sticky_html(st.session_state.tasks[i]), unsafe_allow_html=True) for i in st.session_state.lists["Q4"] if not st.session_state.tasks[i].urgent]
+            cols_bot = st.columns([1,1,1,1])
+            with cols_bot[0]: st.markdown("**Q1**"); [st.markdown(sticky_html(st.session_state.tasks[i]), unsafe_allow_html=True) for i in st.session_state.lists["Q1"] if not st.session_state.tasks[i].urgent]
+            with cols_bot[1]: st.markdown("**🔥 Urgent Q1**"); [st.markdown(sticky_html(t), unsafe_allow_html=True) for i,t in st.session_state.tasks.items() if t.urgent and t.quadrant=="Q1"]
+            with cols_bot[2]: st.markdown("**🔥 Urgent Q2**"); [st.markdown(sticky_html(t), unsafe_allow_html=True) for i,t in st.session_state.tasks.items() if t.urgent and t.quadrant=="Q2"]
+            with cols_bot[3]: st.markdown("**Q2**"); [st.markdown(sticky_html(st.session_state.tasks[i]), unsafe_allow_html=True) for i in st.session_state.lists["Q2"] if not st.session_state.tasks[i].urgent]
 
     # ---------------- PRIORITY TAB ----------------
     with tabs[2]:
