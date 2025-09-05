@@ -305,7 +305,14 @@ with tabs[0]:
 
         # Build label text for display
         def _lbl(tid: str) -> str:
-            return st.session_state.tasks[tid].text
+    """
+    Display just the task text, but embed the UUID in a hidden span
+    so we can still retrieve it after drag-and-drop.
+    """
+    t = st.session_state.tasks[tid]
+    clean_text = t.text[:70] + ("..." if len(t.text) > 70 else "")
+    return f"<span style='display:none'>{tid}</span>{clean_text}"
+
        
          # --- TOP ROW: Q3 | Urgent(Q3) | Urgent(Q4) | Q4 ---
         top_containers = []
@@ -360,25 +367,16 @@ with tabs[0]:
             # Parse the returned structures
             # Top: [Q3, UrgQ3, UrgQ4, Q4]
            # Look up the tid by matching task text
-            new_Q1_ids = [tid for s in top_res[0]["items"]
-                                for tid,t in st.session_state.tasks.items() if t.text == s]
-            new_Q2_ids = [tid for s in top_res[0]["items"]
-                                for tid,t in st.session_state.tasks.items() if t.text == s]
-            new_Q3_ids = [tid for s in top_res[0]["items"]
-                                for tid,t in st.session_state.tasks.items() if t.text == s]
-            new_Q4_ids = [tid for s in top_res[0]["items"]
-                                for tid,t in st.session_state.tasks.items() if t.text == s]
+            new_Q1_ids   = [_extract_id(s) for s in bot_res[0]["items"]]
+new_UQ1_ids  = [_extract_id(s) for s in bot_res[1]["items"]]
+new_UQ2_ids  = [_extract_id(s) for s in bot_res[2]["items"]]
+new_Q2_ids   = [_extract_id(s) for s in bot_res[3]["items"]]
 
+new_Q3_ids   = [_extract_id(s) for s in top_res[0]["items"]]
+new_UQ3_ids  = [_extract_id(s) for s in top_res[1]["items"]]
+new_UQ4_ids  = [_extract_id(s) for s in top_res[2]["items"]]
+new_Q4_ids   = [_extract_id(s) for s in top_res[3]["items"]]
 
-            # Bottom: [Q1, UrgQ1, UrgQ2, Q2]
-               new_Q1_ids = [tid for s in top_res[0]["items"]
-                                for tid,t in st.session_state.tasks.items() if t.text == s]
-                new_Q1_ids = [tid for s in top_res[0]["items"]
-                                for tid,t in st.session_state.tasks.items() if t.text == s]
-                new_Q2_ids = [tid for s in top_res[0]["items"]
-                                for tid,t in st.session_state.tasks.items() if t.text == s]
-                new_Q2_ids = [tid for s in top_res[0]["items"]
-                                for tid,t in st.session_state.tasks.items() if t.text == s]
             # 1) Reset quadrant membership (for non-urgent lists)
             for q in ["Q1","Q2","Q3","Q4"]:
                 st.session_state.lists[q].clear()
@@ -471,7 +469,7 @@ with tabs[0]:
                 st.markdown("**Q1**")
                 for i in st.session_state.lists["Q1"]:
                     t = st.session_state.tasks[i]
-                    if not t.urgent:
+                if not t.urgent:
                         st.markdown(sticky_html(t), unsafe_allow_html=True)
             with cols_bot[1]:
                 st.markdown("**🔥 Urgent Q1**")
