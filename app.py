@@ -348,7 +348,6 @@ with colR:
             display_items = []
             for tid in st.session_state.lists[q]:
                 t = st.session_state.tasks[tid]
-                # Keep the task id in the string so we can map back after drag
                 label = f"{tid}:: {t.text[:70]}{'...' if len(t.text) > 70 else ''}"
                 display_items.append(label)
             containers.append({"header": quad_labels[q], "items": display_items})
@@ -361,7 +360,6 @@ with colR:
                 direction="vertical",
                 key="matrix_sortables"
             )
-
             # Write back new membership & ordering
             for idx, q in enumerate(quad_order):
                 st.session_state.lists[q].clear()
@@ -381,6 +379,7 @@ with colR:
                     for tid in st.session_state.lists[q]:
                         t = st.session_state.tasks[tid]
                         st.markdown(sticky_html(t), unsafe_allow_html=True)
+
 
                 with spots[idx]:
                     st.markdown(f"**{quad_labels[q]}**")
