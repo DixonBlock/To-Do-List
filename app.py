@@ -334,37 +334,54 @@ with colR:
             "Q4": "Q4 • Low Importance, High Effort (Avoid/Delegate)",
         }
 
-        # Build lists for sortables (each item shows a compact card text)
-        q_lists = []
-        for q in ["Q1","Q2","Q3","Q4"]:
+        # Build containers for sortables: list[dict] with 'header' and 'items'
+        containers = []
+        quad_order = ["Q1", "Q2", "Q3", "Q4"]
+        quad_labels = {
+            "Q1": "Q1 • High Importance, Low Effort (Quick Wins)",
+            "Q2": "Q2 • High Importance, High Effort (Projects)",
+            "Q3": "Q3 • Low Importance, Low Effort (Fill-ins)",
+            "Q4": "Q4 • Low Importance, High Effort (Avoid/Delegate)",
+        }
+
+        for q in quad_order:
             display_items = []
             for tid in st.session_state.lists[q]:
                 t = st.session_state.tasks[tid]
-                display_items.append(f"{tid}:: {t.text[:70]}{'...' if len(t.text)>70 else ''}")
-            q_lists.append(display_items)
+                # Keep the task id in the string so we can map back after drag
+                label = f"{tid}:: {t.text[:70]}{'...' if len(t.text) > 70 else ''}"
+                display_items.append(label)
+            containers.append({"header": quad_labels[q], "items": display_items})
 
         if HAS_SORTABLES and any(st.session_state.tasks):
             st.caption("Tip: drag items between boxes. This updates the task's quadrant.")
-            new_lists = _sort_items(
-                q_lists,
+            new_containers = _sort_items(
+                containers,
                 multi_containers=True,
                 direction="vertical",
                 key="matrix_sortables"
             )
+
             # Write back new membership & ordering
-            for q_idx, q in enumerate(["Q1","Q2","Q3","Q4"]):
+            for idx, q in enumerate(quad_order):
                 st.session_state.lists[q].clear()
-                for item in new_lists[q_idx]:
+                for item in new_containers[idx]["items"]:
                     tid = item.split("::", 1)[0]
                     st.session_state.lists[q].append(tid)
                     st.session_state.tasks[tid].quadrant = q
         else:
-            st.info("Install `streamlit-sortables` for drag-and-drop in the matrix.\n\n"
-                    "Without it, the matrix shows current assignments only.")
+            st.info("Install `streamlit-sortables` to enable drag between quadrants. "
+                    "If Cloud couldn't install it, you'll still see current assignments below.")
             c1, c2 = st.columns(2)
             c3, c4 = st.columns(2)
             spots = [c1, c2, c3, c4]
-            for idx, q in enumerate(["Q1","Q2","Q3","Q4"]):
+            for idx, q in enumerate(quad_order):
+                with spots[idx]:
+                    st.markdown(f"**{quad_labels[q]}**")
+                    for tid in st.session_state.lists[q]:
+                        t = st.session_state.tasks[tid]
+                        st.markdown(sticky_html(t), unsafe_allow_html=True)
+
                 with spots[idx]:
                     st.markdown(f"**{quad_labels[q]}**")
                     for tid in st.session_state.lists[q]:
