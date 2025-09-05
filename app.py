@@ -252,15 +252,6 @@ Draft Kickstarter update"""
         )
         st.info("Demo tasks loaded.")
 
-    st.markdown("### 2) Tweak tasks")
-    for tid, t in list(st.session_state.tasks.items()):
-        with st.expander(f"✏️ {t.text[:72]}{'...' if len(t.text) > 72 else ''}", expanded=False):
-            new_text = st.text_input("Text", value=t.text, key=f"text_{tid}")
-            urg = st.toggle("Urgent", value=t.urgent, key=f"urg_{tid}")
-            imp = st.slider("Importance", 0.0, 1.0, t.importance, 0.05, key=f"imp_{tid}")
-            eff = st.slider("Effort", 0.0, 1.0, t.effort, 0.05, key=f"eff_{tid}")
-            eng = st.selectbox("Energy", ["Low", "Medium", "High"], index=["Low", "Medium", "High"].index(t.energy), key=f"eng_{tid}")
-
             # Apply edits
             t.text, t.urgent, t.importance, t.effort, t.energy = new_text, urg, imp, eff, eng
             new_quad = compute_quadrant(t.importance, t.effort)
@@ -269,7 +260,17 @@ Draft Kickstarter update"""
                     st.session_state.lists[t.quadrant].remove(tid)
                 st.session_state.lists[new_quad].append(tid)
                 t.quadrant = new_quad
-
+                def quadrant_to_scores(q: str) -> tuple[float, float]:
+            # Representative values; adjust if you like
+            if q == "Q1":  # High Imp, Low Eff
+                return 0.85, 0.25
+            if q == "Q2":  # High Imp, High Eff
+                return 0.85, 0.80
+            if q == "Q3":  # Low Imp, Low Eff
+                return 0.30, 0.25
+            # Q4: Low Imp, High Eff
+            return 0.30, 0.80
+       
             # ONE Thing
             if st.radio("ONE Thing (pick at most one)", ["No", "Yes"], index=1 if st.session_state.ONE_THING == tid else 0, key=f"one_{tid}") == "Yes":
                 st.session_state.ONE_THING = tid
@@ -290,9 +291,10 @@ with colR:
 
     tabs = st.tabs(["🔲 Matrix (Importance × Effort)", "📌 Corkboard (freeform drag)", "📜 Priority List & Export"])
 
-    # ---------------- MATRIX TAB ----------------
+       # ---------------- MATRIX TAB ----------------
     with tabs[0]:
-        st.write("Drag notes between quadrants. Urgency toggles and sliders are on the left.")
+        st.write("Drag notes between quadrants (this **is** the corkboard). "
+                 "Drop into 🔥 Urgent to flag urgency; drop back into a quadrant to unflag.")
 
         quad_order = ["Q1", "Q2", "Q3", "Q4"]
         quad_labels = {
@@ -302,45 +304,90 @@ with colR:
             "Q4": "Q4 • Low Importance, High Effort (Avoid/Delegate)",
         }
 
-        # Build containers for sortables: list[dict] with 'header' and 'items'
+        # Build 5 containers: Urgent lane + four quadrants.
+        # Each item appears in exactly one container.
         containers = []
+
+        # 0) Urgent lane (contains all tasks with urgent=True)
+        urgent_items = []
+        for tid, t in st.session_state.tasks.items():
+            if t.urgent:
+                urgent_items.append(f"{tid}:: {t.text[:70]}{'...' if len(t.text) > 70 else ''}")
+        containers.append({"header": "🔥 Urgent (drop here to flag)", "items": urgent_items})
+
+        # 1–4) Quadrants (only show non-urgent tasks here)
         for q in quad_order:
             display_items = []
             for tid in st.session_state.lists[q]:
                 t = st.session_state.tasks[tid]
-                label = f"{tid}:: {t.text[:70]}{'...' if len(t.text) > 70 else ''}"
-                display_items.append(label)
+                if not t.urgent:  # urgent ones are shown in the urgent lane
+                    display_items.append(f"{tid}:: {t.text[:70]}{'...' if len(t.text) > 70 else ''}")
             containers.append({"header": quad_labels[q], "items": display_items})
 
         if HAS_SORTABLES and any(st.session_state.tasks):
-            st.caption("Tip: drag items between boxes. This updates the task's quadrant.")
+            st.caption("Tip: drag items between the five boxes to update urgency/quadrant.")
             new_containers = _sort_items(
                 containers,
                 multi_containers=True,
                 direction="vertical",
-                key="matrix_sortables",
+                key="matrix_sortables_v2",
             )
-            # Write back new membership & ordering
-            for idx, q in enumerate(quad_order):
+
+            # Write back changes:
+            #  - new_containers[0] = Urgent lane
+            #  - new_containers[1..4] = Q1..Q4
+            # 1) First, mark urgent=True for items in urgent lane; do NOT change their quadrant
+            urgent_now = set()
+            for item in new_containers[0]["items"]:
+                tid = item.split("::", 1)[0]
+                urgent_now.add(tid)
+            # 2) Next, rebuild quadrant membership from containers 1..4 and mark urgent=False if moved there
+            for idx, q in enumerate(quad_order, start=1):
                 st.session_state.lists[q].clear()
                 for item in new_containers[idx]["items"]:
                     tid = item.split("::", 1)[0]
                     st.session_state.lists[q].append(tid)
-                    st.session_state.tasks[tid].quadrant = q
+                    # This placement sets the canonical quadrant
+                    t = st.session_state.tasks[tid]
+                    t.quadrant = q
+                    t.urgent = False
+                    # Update importance/effort based on quadrant
+                    imp, eff = quadrant_to_scores(q)
+                    t.importance, t.effort = imp, eff
+
+            # 3) Finally, apply urgency flags AFTER quadrant assignment (so both states are consistent)
+            for tid, t in st.session_state.tasks.items():
+                if tid in urgent_now:
+                    t.urgent = True
+                # If a task is urgent but not present in any quadrant list (e.g., newly added), keep its previous quadrant.
+                # Ensure each task exists in some quadrant list for later tabs:
+                if tid not in urgent_now and all(tid not in st.session_state.lists[q] for q in quad_order):
+                    # Fall back to its current t.quadrant or compute one
+                    q = t.quadrant if t.quadrant in quad_order else compute_quadrant(t.importance, t.effort)
+                    if tid not in st.session_state.lists[q]:
+                        st.session_state.lists[q].append(tid)
         else:
             st.info(
-                "Install `streamlit-sortables` to enable drag between quadrants. "
-                "If Cloud couldn't install it, you'll still see current assignments below."
+                "Install `streamlit-sortables` to enable drag. If Cloud couldn't install it, "
+                "you'll still see current assignments below."
             )
-            c1, c2 = st.columns(2)
-            c3, c4 = st.columns(2)
-            spots = [c1, c2, c3, c4]
+            c1 = st.container(border=True)
+            c1.markdown("**🔥 Urgent**")
+            for tid, t in st.session_state.tasks.items():
+                if t.urgent:
+                    c1.markdown(sticky_html(t), unsafe_allow_html=True)
+
+            c2, c3 = st.columns(2)
+            c4, c5 = st.columns(2)
+            spots = [c2, c3, c4, c5]
             for idx, q in enumerate(quad_order):
                 with spots[idx]:
                     st.markdown(f"**{quad_labels[q]}**")
                     for tid in st.session_state.lists[q]:
                         t = st.session_state.tasks[tid]
-                        st.markdown(sticky_html(t), unsafe_allow_html=True)
+                        if not t.urgent:
+                            st.markdown(sticky_html(t), unsafe_allow_html=True)
+
 
     # ---------------- CORKBOARD TAB ----------------
     with tabs[1]:
@@ -412,7 +459,7 @@ with colR:
                 i += 3
 
         df = to_dataframe(prioritized)
-        st.dataframe(df, width="stretch")
+        st.data_editor(df, width="stretch", disabled=True)
 
         csv_bytes = df.to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Download CSV", data=csv_bytes, file_name="prioritized_tasks.csv", mime="text/csv")
