@@ -289,7 +289,7 @@ QUAD_STYLE = {
 
 
     # ---------------- MATRIX TAB ----------------
-    with tabs[0]:
+with tabs[0]:
         st.write(
             "Drag sticky notes between boxes. Each quadrant has its **own** urgent corner:\n"
             "• Q3 urgent (top-left inside) • Q4 urgent (top-right inside) • Q1 urgent (bottom-left inside) • Q2 urgent (bottom-right inside).\n"
