@@ -255,36 +255,36 @@ Draft Kickstarter update"""
             # Apply edits
         t.text, t.urgent, t.importance, t.effort, t.energy = new_text, urg, imp, eff, eng
         new_quad = compute_quadrant(t.importance, t.effort)
-            if new_quad != t.quadrant:
-                if tid in st.session_state.lists[t.quadrant]:
-                    st.session_state.lists[t.quadrant].remove(tid)
-                st.session_state.lists[new_quad].append(tid)
-                t.quadrant = new_quad
-                def quadrant_to_scores(q: str) -> tuple[float, float]:
+        if new_quad != t.quadrant:
+            if tid in st.session_state.lists[t.quadrant]:
+                st.session_state.lists[t.quadrant].remove(tid)
+            st.session_state.lists[new_quad].append(tid)
+            t.quadrant = new_quad
+            def quadrant_to_scores(q: str) -> tuple[float, float]:
             # Representative values; adjust if you like
-            if q == "Q1":  # High Imp, Low Eff
-                return 0.85, 0.25
-            if q == "Q2":  # High Imp, High Eff
-                return 0.85, 0.80
-            if q == "Q3":  # Low Imp, Low Eff
-                return 0.30, 0.25
+        if q == "Q1":  # High Imp, Low Eff
+            return 0.85, 0.25
+        if q == "Q2":  # High Imp, High Eff
+            return 0.85, 0.80
+        if q == "Q3":  # Low Imp, Low Eff
+            return 0.30, 0.25
             # Q4: Low Imp, High Eff
-            return 0.30, 0.80
+        return 0.30, 0.80
        
             # ONE Thing
-            if st.radio("ONE Thing (pick at most one)", ["No", "Yes"], index=1 if st.session_state.ONE_THING == tid else 0, key=f"one_{tid}") == "Yes":
-                st.session_state.ONE_THING = tid
-            elif st.session_state.ONE_THING == tid:
-                st.session_state.ONE_THING = None
+        if st.radio("ONE Thing (pick at most one)", ["No", "Yes"], index=1 if st.session_state.ONE_THING == tid else 0, key=f"one_{tid}") == "Yes":
+            st.session_state.ONE_THING = tid
+        elif st.session_state.ONE_THING == tid:
+            st.session_state.ONE_THING = None
 
-            if st.button("🗑️ Delete", key=f"del_{tid}", type="secondary"):
-                try:
-                    st.session_state.lists[t.quadrant].remove(tid)
-                except ValueError:
-                    pass
-                del st.session_state.tasks[tid]
-                st.warning("Deleted.")
-                st.stop()
+        if st.button("🗑️ Delete", key=f"del_{tid}", type="secondary"):
+            try:
+                st.session_state.lists[t.quadrant].remove(tid)
+            except ValueError:
+                pass
+            del st.session_state.tasks[tid]
+            st.warning("Deleted.")
+            st.stop()
 
 with colR:
     st.markdown("### 3) Board")
