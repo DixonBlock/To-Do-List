@@ -41,7 +41,7 @@ st.set_page_config(
 
 # ======= THEME / CSS ==========================================================
     # ---------------- CORKBOARD TAB ----------------
-    with tabs[1]:
+with tabs[1]:
         if HAS_ELEMENTS and any(st.session_state.tasks):
             st.caption("Drag and resize sticky notes freely. (Powered by `streamlit-elements`)")
             from streamlit_elements import elements, mui, dashboard
