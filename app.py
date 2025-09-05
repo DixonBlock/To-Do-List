@@ -4,7 +4,7 @@
 
 import uuid
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 import time
 
 import pandas as pd
@@ -17,8 +17,9 @@ try:
 except Exception:
     HAS_SORTABLES = False
 
+# Keeping these flags for future use; not required in this version
 try:
-    from streamlit_elements import elements, mui, dashboard
+    from streamlit_elements import elements, mui, dashboard  # noqa: F401
     HAS_ELEMENTS = True
 except Exception:
     HAS_ELEMENTS = False
@@ -38,7 +39,6 @@ st.set_page_config(
 )
 
 # ======= THEME / CSS ==========================================================
-# Corkboard/whiteboard background + sticky note look
 st.markdown(
     """
 <style>
@@ -89,7 +89,6 @@ class Task:
 
     def score(self) -> float:
         """
-        ### [SECTION: PRIORITIZATION]
         Composite score blending Pareto, Eisenhower, quick-wins, and effort penalty.
         """
         w_importance = 0.60
@@ -111,9 +110,7 @@ def _init_state():
     if "tasks" not in st.session_state:
         st.session_state.tasks: Dict[str, Task] = {}
     if "lists" not in st.session_state:
-        st.session_state.lists: Dict[str, List[str]] = {
-            "Q1": [], "Q2": [], "Q3": [], "Q4": [],
-        }
+        st.session_state.lists: Dict[str, List[str]] = {"Q1": [], "Q2": [], "Q3": [], "Q4": []}
     if "ONE_THING" not in st.session_state:
         st.session_state.ONE_THING: Optional[str] = None
 
@@ -145,7 +142,7 @@ def compute_quadrant(importance: float, effort: float) -> str:
         "Q3" if importance <  0.5 and effort <  0.5 else
         "Q4"
     )
-    
+
 def quadrant_to_scores(q: str) -> tuple[float, float]:
     if q == "Q1":  # High Imp, Low Eff
         return 0.85, 0.25
@@ -167,7 +164,6 @@ def add_tasks_from_text(raw: str):
         st.session_state.tasks[tid] = t
         st.session_state.lists[quad].append(tid)
 
-
 def sticky_html(task: Task) -> str:
     urgent_class = " urgent" if task.urgent else ""
     return f"""
@@ -181,7 +177,6 @@ def sticky_html(task: Task) -> str:
     </div>
     """
 
-
 def export_markdown(tasks: List[Task]) -> str:
     lines = ["# Prioritized Tasks", ""]
     for i, t in enumerate(tasks, 1):
@@ -190,7 +185,6 @@ def export_markdown(tasks: List[Task]) -> str:
             f"(Imp {t.importance:.2f}, Eff {t.effort:.2f}, Energy {t.energy}, {t.quadrant})"
         )
     return "\n".join(lines)
-
 
 def to_dataframe(tasks: List[Task]) -> pd.DataFrame:
     return pd.DataFrame([{
@@ -261,46 +255,12 @@ Draft Kickstarter update"""
         )
         st.info("Demo tasks loaded.")
 
-            # Apply edits
-        t.text, t.urgent, t.importance, t.effort, t.energy = new_text, urg, imp, eff, eng
-        new_quad = compute_quadrant(t.importance, t.effort)
-        if new_quad != t.quadrant:
-            if tid in st.session_state.lists[t.quadrant]:
-                st.session_state.lists[t.quadrant].remove(tid)
-            st.session_state.lists[new_quad].append(tid)
-            t.quadrant = new_quad
-            def quadrant_to_scores(q: str) -> tuple[float, float]:
-            # Representative values; adjust if you like
-            if q == "Q1":  # High Imp, Low Eff
-                return 0.85, 0.25
-            if q == "Q2":  # High Imp, High Eff
-                return 0.85, 0.80
-            if q == "Q3":  # Low Imp, Low Eff
-                return 0.30, 0.25
-            # Q4: Low Imp, High Eff
-            return 0.30, 0.80
-       
-            # ONE Thing
-        if st.radio("ONE Thing (pick at most one)", ["No", "Yes"], index=1 if st.session_state.ONE_THING == tid else 0, key=f"one_{tid}") == "Yes":
-            st.session_state.ONE_THING = tid
-        elif st.session_state.ONE_THING == tid:
-            st.session_state.ONE_THING = None
-
-        if st.button("🗑️ Delete", key=f"del_{tid}", type="secondary"):
-            try:
-                st.session_state.lists[t.quadrant].remove(tid)
-            except ValueError:
-                pass
-            del st.session_state.tasks[tid]
-            st.warning("Deleted.")
-            st.stop()
-
 with colR:
-    st.markdown("### 3) Board")
+    st.markdown("### 2) Board")
 
-        tabs = st.tabs(["🔲 Matrix (drag here)", "📜 Priority List & Export"])
+    tabs = st.tabs(["🔲 Matrix (drag here)", "📜 Priority List & Export"])
 
-         # ---------------- MATRIX TAB ----------------
+    # ---------------- MATRIX TAB ----------------
     with tabs[0]:
         st.write(
             "Drag sticky notes between boxes. Each quadrant has its **own** urgent corner:\n"
@@ -441,20 +401,58 @@ with colR:
                     if tid not in st.session_state.lists[q]:
                         st.session_state.lists[q].append(tid)
         else:
+            # Fallback, non-draggable layout
             st.info("Install `streamlit-sortables` to enable drag. You’ll still see the current state below.")
             cols_top = st.columns([1,1,1,1])
-            with cols_top[0]: st.markdown("**Q3**"); [st.markdown(sticky_html(st.session_state.tasks[i]), unsafe_allow_html=True) for i in st.session_state.lists["Q3"] if not st.session_state.tasks[i].urgent]
-            with cols_top[1]: st.markdown("**🔥 Urgent Q3**"); [st.markdown(sticky_html(t), unsafe_allow_html=True) for i,t in st.session_state.tasks.items() if t.urgent and t.quadrant=="Q3"]
-            with cols_top[2]: st.markdown("**🔥 Urgent Q4**"); [st.markdown(sticky_html(t), unsafe_allow_html=True) for i,t in st.session_state.tasks.items() if t.urgent and t.quadrant=="Q4"]
-            with cols_top[3]: st.markdown("**Q4**"); [st.markdown(sticky_html(st.session_state.tasks[i]), unsafe_allow_html=True) for i in st.session_state.lists["Q4"] if not st.session_state.tasks[i].urgent]
+            with cols_top[0]:
+                st.markdown("**Q3**")
+                for i in st.session_state.lists["Q3"]:
+                    t = st.session_state.tasks[i]
+                    if not t.urgent:
+                        st.markdown(sticky_html(t), unsafe_allow_html=True)
+            with cols_top[1]:
+                st.markdown("**🔥 Urgent Q3**")
+                for i, t in st.session_state.tasks.items():
+                    if t.urgent and t.quadrant == "Q3":
+                        st.markdown(sticky_html(t), unsafe_allow_html=True)
+            with cols_top[2]:
+                st.markdown("**🔥 Urgent Q4**")
+                for i, t in st.session_state.tasks.items():
+                    if t.urgent and t.quadrant == "Q4":
+                        st.markdown(sticky_html(t), unsafe_allow_html=True)
+            with cols_top[3]:
+                st.markdown("**Q4**")
+                for i in st.session_state.lists["Q4"]:
+                    t = st.session_state.tasks[i]
+                    if not t.urgent:
+                        st.markdown(sticky_html(t), unsafe_allow_html=True)
+
             cols_bot = st.columns([1,1,1,1])
-            with cols_bot[0]: st.markdown("**Q1**"); [st.markdown(sticky_html(st.session_state.tasks[i]), unsafe_allow_html=True) for i in st.session_state.lists["Q1"] if not st.session_state.tasks[i].urgent]
-            with cols_bot[1]: st.markdown("**🔥 Urgent Q1**"); [st.markdown(sticky_html(t), unsafe_allow_html=True) for i,t in st.session_state.tasks.items() if t.urgent and t.quadrant=="Q1"]
-            with cols_bot[2]: st.markdown("**🔥 Urgent Q2**"); [st.markdown(sticky_html(t), unsafe_allow_html=True) for i,t in st.session_state.tasks.items() if t.urgent and t.quadrant=="Q2"]
-            with cols_bot[3]: st.markdown("**Q2**"); [st.markdown(sticky_html(st.session_state.tasks[i]), unsafe_allow_html=True) for i in st.session_state.lists["Q2"] if not st.session_state.tasks[i].urgent]
+            with cols_bot[0]:
+                st.markdown("**Q1**")
+                for i in st.session_state.lists["Q1"]:
+                    t = st.session_state.tasks[i]
+                    if not t.urgent:
+                        st.markdown(sticky_html(t), unsafe_allow_html=True)
+            with cols_bot[1]:
+                st.markdown("**🔥 Urgent Q1**")
+                for i, t in st.session_state.tasks.items():
+                    if t.urgent and t.quadrant == "Q1":
+                        st.markdown(sticky_html(t), unsafe_allow_html=True)
+            with cols_bot[2]:
+                st.markdown("**🔥 Urgent Q2**")
+                for i, t in st.session_state.tasks.items():
+                    if t.urgent and t.quadrant == "Q2":
+                        st.markdown(sticky_html(t), unsafe_allow_html=True)
+            with cols_bot[3]:
+                st.markdown("**Q2**")
+                for i in st.session_state.lists["Q2"]:
+                    t = st.session_state.tasks[i]
+                    if not t.urgent:
+                        st.markdown(sticky_html(t), unsafe_allow_html=True)
 
     # ---------------- PRIORITY TAB ----------------
-    with tabs[2]:
+    with tabs[1]:
         st.write("Ordered list blends Pareto (impact), Eisenhower (urgent/important), quick-wins, and your energy mode.")
         all_tasks = list(st.session_state.tasks.values())
 
