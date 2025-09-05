@@ -253,7 +253,7 @@ Draft Kickstarter update"""
         st.info("Demo tasks loaded.")
 
             # Apply edits
-            t.text, t.urgent, t.importance, t.effort, t.energy = new_text, urg, imp, eff, eng
+        t.text, t.urgent, t.importance, t.effort, t.energy = new_text, urg, imp, eff, eng
             new_quad = compute_quadrant(t.importance, t.effort)
             if new_quad != t.quadrant:
                 if tid in st.session_state.lists[t.quadrant]:
