@@ -1,6 +1,5 @@
 # app.py
 # Streamlit Brain Dump → Sticky Notes → Matrix → Energy-aware Priority List
-# GitHub + Streamlit Cloud ready
 
 import uuid
 from dataclasses import dataclass
@@ -47,8 +46,8 @@ st.markdown(
   box-shadow: 0 6px 18px rgba(0,0,0,0.08);
   border: 1px solid rgba(0,0,0,0.05);
   font-size: 0.95rem;
-  line-height: 1.25rem;      /* keeps consistent height */
-  margin-bottom: 10px;       /* spacing between stickies */
+  line-height: 1.25rem;
+  margin-bottom: 10px;
 }
 
 /* quadrant headings */
@@ -87,8 +86,8 @@ class Task:
         """Composite score blending Pareto, Eisenhower, quick-wins, and effort penalty."""
         w_importance = 0.60
         w_urgency    = 0.20
-        w_effort     = 0.15  # subtractive
-        w_quickwin   = 0.10  # bonus if high imp & low effort
+        w_effort     = 0.15
+        w_quickwin   = 0.10
 
         s = self.importance * w_importance
         s += (1.0 if self.urgent else 0.0) * w_urgency
@@ -229,7 +228,7 @@ with colL:
     raw = st.text_area(
         "Paste or type. Each line becomes a sticky note:",
         height=180,
-        placeholder="Type tasks here.\nOne task per line.",
+        placeholder="Example:\nEmail Anna contract update\nRecord tutorial intro\nBook venue for demo day\nPay VAT invoice\nSketch app icon ideas",
         key="dumpbox",
     )
     if st.button("➕ Add to board", type="primary"):
@@ -254,7 +253,7 @@ with colR:
 
     tabs = st.tabs(["🔲 Matrix (drag here)", "📜 Priority List & Export"])
 
-    # ---- Shared style for containers (frame + min height for ~3 stickies)
+    # ---- Style (frame + min height for ~3 stickies)
     QUAD_STYLE = {
         "container": {
             "border": "3px solid #1f4e63",
@@ -262,12 +261,21 @@ with colR:
             "background": "#0c2f3b0d",
             "padding": "10px",
             "margin": "6px",
-            "minHeight": "270px",  # adjust if you change sticky height
+            "minHeight": "270px",
             "boxSizing": "border-box",
         },
         "header": {"fontWeight": 700, "padding": "6px 8px 10px 8px", "color": "#0c2f3b"},
         "item": {"marginBottom": "10px"},
     }
+
+    PLACEHOLDER = "· Drop here ·"
+
+    def ensure_nonempty(items: List[str]) -> List[str]:
+        """Make sure the list renders a visible box even when empty."""
+        return items if items else [PLACEHOLDER]
+
+    def is_placeholder(s: str) -> bool:
+        return s.strip() == PLACEHOLDER
 
     # ---------------- MATRIX TAB ----------------
     with tabs[0]:
@@ -290,27 +298,37 @@ with colR:
             # embed UUID in a hidden span so we can recover it after DnD
             return f"<span style='display:none'>{tid}</span>{clean_text}"
 
-        def _extract_id(item: str) -> str:
-            match = re.search(r"<span style='display:none'>(.*?)</span>", item)
-            return match.group(1) if match else item
+        def _extract_id(item: str) -> Optional[str]:
+            """Return task id if present; None for placeholders or unknown strings."""
+            if is_placeholder(item):
+                return None
+            m = re.search(r"<span style='display:none'>(.*?)</span>", item)
+            return m.group(1) if m else None
 
-        # Build containers
+        # Build containers (add placeholders so boxes are visible)
         top_containers = [
-            {"header": f"Q3 • {quad_labels['Q3']}", "items": [_lbl(tid) for tid in st.session_state.lists["Q3"] if not st.session_state.tasks[tid].urgent]},
-            {"header": "🔥 Urgent • Q3 corner", "items": [_lbl(tid) for tid, t in st.session_state.tasks.items() if t.urgent and t.quadrant == "Q3"]},
-            {"header": "🔥 Urgent • Q4 corner", "items": [_lbl(tid) for tid, t in st.session_state.tasks.items() if t.urgent and t.quadrant == "Q4"]},
-            {"header": f"Q4 • {quad_labels['Q4']}", "items": [_lbl(tid) for tid in st.session_state.lists["Q4"] if not st.session_state.tasks[tid].urgent]},
+            {"header": f"Q3 • {quad_labels['Q3']}",
+             "items": ensure_nonempty([_lbl(tid) for tid in st.session_state.lists["Q3"] if not st.session_state.tasks[tid].urgent])},
+            {"header": "🔥 Urgent • Q3 corner",
+             "items": ensure_nonempty([_lbl(tid) for tid, t in st.session_state.tasks.items() if t.urgent and t.quadrant == "Q3"])},
+            {"header": "🔥 Urgent • Q4 corner",
+             "items": ensure_nonempty([_lbl(tid) for tid, t in st.session_state.tasks.items() if t.urgent and t.quadrant == "Q4"])},
+            {"header": f"Q4 • {quad_labels['Q4']}",
+             "items": ensure_nonempty([_lbl(tid) for tid in st.session_state.lists["Q4"] if not st.session_state.tasks[tid].urgent])},
         ]
         bot_containers = [
-            {"header": f"Q1 • {quad_labels['Q1']}", "items": [_lbl(tid) for tid in st.session_state.lists["Q1"] if not st.session_state.tasks[tid].urgent]},
-            {"header": "🔥 Urgent • Q1 corner", "items": [_lbl(tid) for tid, t in st.session_state.tasks.items() if t.urgent and t.quadrant == "Q1"]},
-            {"header": "🔥 Urgent • Q2 corner", "items": [_lbl(tid) for tid, t in st.session_state.tasks.items() if t.urgent and t.quadrant == "Q2"]},
-            {"header": f"Q2 • {quad_labels['Q2']}", "items": [_lbl(tid) for tid in st.session_state.lists["Q2"] if not st.session_state.tasks[tid].urgent]},
+            {"header": f"Q1 • {quad_labels['Q1']}",
+             "items": ensure_nonempty([_lbl(tid) for tid in st.session_state.lists["Q1"] if not st.session_state.tasks[tid].urgent])},
+            {"header": "🔥 Urgent • Q1 corner",
+             "items": ensure_nonempty([_lbl(tid) for tid, t in st.session_state.tasks.items() if t.urgent and t.quadrant == "Q1"])},
+            {"header": "🔥 Urgent • Q2 corner",
+             "items": ensure_nonempty([_lbl(tid) for tid, t in st.session_state.tasks.items() if t.urgent and t.quadrant == "Q2"])},
+            {"header": f"Q2 • {quad_labels['Q2']}",
+             "items": ensure_nonempty([_lbl(tid) for tid in st.session_state.lists["Q2"] if not st.session_state.tasks[tid].urgent])},
         ]
 
-        if HAS_SORTABLES and any(st.session_state.tasks):
-            st.caption("Tip: you can drag across rows by dropping into an urgent box first, then into the target row.")
-
+        if HAS_SORTABLES:
+            # Always render the boxes; they’ll be placeholders when empty
             top_res = _sort_items(
                 top_containers,
                 multi_containers=True,
@@ -326,52 +344,56 @@ with colR:
                 styles=QUAD_STYLE,
             )
 
-            new_Q3_ids   = [_extract_id(s) for s in top_res[0]["items"]]
-            new_UQ3_ids  = [_extract_id(s) for s in top_res[1]["items"]]
-            new_UQ4_ids  = [_extract_id(s) for s in top_res[2]["items"]]
-            new_Q4_ids   = [_extract_id(s) for s in top_res[3]["items"]]
+            # If there are no tasks, nothing else to do
+            if not st.session_state.tasks:
+                st.caption("Add tasks on the left, then drag them between boxes.")
+            else:
+                # Parse safely (ignore placeholders / unknowns)
+                new_Q3_ids   = [tid for s in top_res[0]["items"] if (tid := _extract_id(s)) and tid in st.session_state.tasks]
+                new_UQ3_ids  = [tid for s in top_res[1]["items"] if (tid := _extract_id(s)) and tid in st.session_state.tasks]
+                new_UQ4_ids  = [tid for s in top_res[2]["items"] if (tid := _extract_id(s)) and tid in st.session_state.tasks]
+                new_Q4_ids   = [tid for s in top_res[3]["items"] if (tid := _extract_id(s)) and tid in st.session_state.tasks]
 
-            new_Q1_ids   = [_extract_id(s) for s in bot_res[0]["items"]]
-            new_UQ1_ids  = [_extract_id(s) for s in bot_res[1]["items"]]
-            new_UQ2_ids  = [_extract_id(s) for s in bot_res[2]["items"]]
-            new_Q2_ids   = [_extract_id(s) for s in bot_res[3]["items"]]
+                new_Q1_ids   = [tid for s in bot_res[0]["items"] if (tid := _extract_id(s)) and tid in st.session_state.tasks]
+                new_UQ1_ids  = [tid for s in bot_res[1]["items"] if (tid := _extract_id(s)) and tid in st.session_state.tasks]
+                new_UQ2_ids  = [tid for s in bot_res[2]["items"] if (tid := _extract_id(s)) and tid in st.session_state.tasks]
+                new_Q2_ids   = [tid for s in bot_res[3]["items"] if (tid := _extract_id(s)) and tid in st.session_state.tasks]
 
-            # reset lists
-            for q in ["Q1","Q2","Q3","Q4"]:
-                st.session_state.lists[q].clear()
+                # reset lists
+                for q in ["Q1","Q2","Q3","Q4"]:
+                    st.session_state.lists[q].clear()
 
-            # assign non-urgent
-            for tid in new_Q1_ids:
-                st.session_state.lists["Q1"].append(tid)
-                t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q1", False
-                t.importance, t.effort = quadrant_to_scores("Q1")
-            for tid in new_Q2_ids:
-                st.session_state.lists["Q2"].append(tid)
-                t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q2", False
-                t.importance, t.effort = quadrant_to_scores("Q2")
-            for tid in new_Q3_ids:
-                st.session_state.lists["Q3"].append(tid)
-                t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q3", False
-                t.importance, t.effort = quadrant_to_scores("Q3")
-            for tid in new_Q4_ids:
-                st.session_state.lists["Q4"].append(tid)
-                t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q4", False
-                t.importance, t.effort = quadrant_to_scores("Q4")
+                # assign non-urgent
+                for tid in new_Q1_ids:
+                    st.session_state.lists["Q1"].append(tid)
+                    t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q1", False
+                    t.importance, t.effort = quadrant_to_scores("Q1")
+                for tid in new_Q2_ids:
+                    st.session_state.lists["Q2"].append(tid)
+                    t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q2", False
+                    t.importance, t.effort = quadrant_to_scores("Q2")
+                for tid in new_Q3_ids:
+                    st.session_state.lists["Q3"].append(tid)
+                    t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q3", False
+                    t.importance, t.effort = quadrant_to_scores("Q3")
+                for tid in new_Q4_ids:
+                    st.session_state.lists["Q4"].append(tid)
+                    t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q4", False
+                    t.importance, t.effort = quadrant_to_scores("Q4")
 
-            # urgent flags
-            for tid in new_UQ1_ids:
-                t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q1", True
-                t.importance, t.effort = quadrant_to_scores("Q1")
-            for tid in new_UQ2_ids:
-                t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q2", True
-                t.importance, t.effort = quadrant_to_scores("Q2")
-            for tid in new_UQ3_ids:
-                t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q3", True
-                t.importance, t.effort = quadrant_to_scores("Q3")
-            for tid in new_UQ4_ids:
-                t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q4", True
-                t.importance, t.effort = quadrant_to_scores("Q4")
-
+                # urgent flags
+                for tid in new_UQ1_ids:
+                    t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q1", True
+                    t.importance, t.effort = quadrant_to_scores("Q1")
+                for tid in new_UQ2_ids:
+                    t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q2", True
+                    t.importance, t.effort = quadrant_to_scores("Q2")
+                for tid in new_UQ3_ids:
+                    t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q3", True
+                    t.importance, t.effort = quadrant_to_scores("Q3")
+                for tid in new_UQ4_ids:
+                    t = st.session_state.tasks[tid]; t.quadrant, t.urgent = "Q4", True
+                    t.importance, t.effort = quadrant_to_scores("Q4")
         else:
             st.info("Install `streamlit-sortables` to enable drag.")
 
