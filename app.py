@@ -40,52 +40,33 @@ st.set_page_config(
 )
 
 # ======= THEME / CSS ==========================================================
-# Corkboard/whiteboard background + sticky note look
-st.markdown("""
-<style>
-/* page background */
-.main {
-  background: #f6f3e7; /* corkboard-ish */
-}
+    # ---------------- CORKBOARD TAB ----------------
+    with tabs[1]:
+        if HAS_ELEMENTS and any(st.session_state.tasks):
+            st.caption("Drag and resize sticky notes freely. (Powered by `streamlit-elements`)")
+            from streamlit_elements import elements, mui, dashboard
 
-/* sticky "post-it" card */
-.sticky {
-  background: #fff59d; /* soft yellow */
-  border-radius: 12px;
-  padding: 10px 12px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-  border: 1px solid rgba(0,0,0,0.05);
-  font-size: 0.95rem;
-}
+            with elements("corkboard"):
+                # Create a simple dashboard layout; we don't persist positions in this version
+                layout = []
+                default_positions = {"Q1": (0, 0), "Q2": (6, 0), "Q3": (0, 8), "Q4": (6, 8)}
+                for i, (tid, t) in enumerate(st.session_state.tasks.items()):
+                    x, y = default_positions.get(t.quadrant, (0, 0))
+                    # stagger a bit so notes don't overlap perfectly
+                    layout.append(dashboard.Item(tid, x + (i % 3) * 2, y + (i % 2) * 2, 6, 4, isResizable=True, isDraggable=True))
 
-/* quadrant headings */
-.quad-title {
-  font-weight: 700;
-  margin-bottom: 6px;
-}
+                with dashboard.Grid(layout=layout, draggableHandle=None):
+                    for tid, t in st.session_state.tasks.items():
+                        with mui.Paper(key=tid, elevation=3, sx={"padding":"10px", "background":"#fff59d",
+                                                                 "borderRadius":"12px","border":"1px solid rgba(0,0,0,0.05)"}):
+                            mui.Typography(t.text)
+                            mui.Chip(label=f"Imp {t.importance:.2f}", size="small", sx={"mr":0.5})
+                            mui.Chip(label=f"Eff {t.effort:.2f}", size="small", sx={"mr":0.5})
+                            if t.urgent:
+                                mui.Chip(label="URGENT", color="error", size="small")
+        else:
+            st.info("Install `streamlit-elements` (already in requirements) to enable the freeform corkboard.")
 
-/* faint tags */
-.tag {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(0,0,0,0.06);
-  font-size: 0.75rem;
-  margin-right: 6px;
-}
-
-/* urgency highlight */
-.urgent {
-  outline: 2px solid #ef5350;
-}
-
-/* smaller help text alignment */
-.small {
-  font-size: 0.85rem;
-  color: #555;
-}
-</style>
-""", unsafe_allow_html=True)
 
 
 # ======= DATA MODELS ==========================================================
