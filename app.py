@@ -408,10 +408,6 @@ with colR:
         st.write("Ordered list blends Pareto (impact), Eisenhower (urgent/important), quick-wins, and your energy mode.")
         all_tasks = list(st.session_state.tasks.values())
 
-        # Energy flow shaping
-        def energy_rank(e: str) -> int:
-            return {"Low":0, "Medium":1, "High":2}.get(e, 1)
-
         # Base ordering by score
         base_sorted = sorted(all_tasks, key=lambda t: (t.score(), -t.effort), reverse=True)
 
@@ -422,31 +418,29 @@ with colR:
                 base_sorted.remove(one)
                 base_sorted.insert(0, one)
 
-        # Shape by energy mode
+        # Shape by energy mode (from sidebar variable `energy_mode`)
         if energy_mode == "Cluster similar":
-            # stable sort by energy buckets while respecting score
             groups = {"High": [], "Medium": [], "Low": []}
             for t in base_sorted:
                 groups.setdefault(t.energy, []).append(t)
             prioritized = groups["High"] + groups["Medium"] + groups["Low"]
         else:
-            # Alternate heavy/light (High ↔ Low), then Mediums sprinkled
             highs = [t for t in base_sorted if t.energy == "High"]
             lows  = [t for t in base_sorted if t.energy == "Low"]
             meds  = [t for t in base_sorted if t.energy == "Medium"]
             prioritized = []
             while highs or lows:
-                if highs: prioritized.append(highs.pop(0))
-                if lows:  prioritized.append(lows.pop(0))
-            # Insert mediums every 2 steps
+                if highs:
+                    prioritized.append(highs.pop(0))
+                if lows:
+                    prioritized.append(lows.pop(0))
             i = 2
             for m in meds:
                 prioritized.insert(min(i, len(prioritized)), m)
                 i += 3
 
-        # Display table + downloads
         df = to_dataframe(prioritized)
-       st.dataframe(df, width="stretch")
+        st.dataframe(df, width="stretch")
 
         csv_bytes = df.to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Download CSV", data=csv_bytes, file_name="prioritized_tasks.csv", mime="text/csv")
@@ -455,27 +449,34 @@ with colR:
         st.download_button("⬇️ Download Markdown", data=md.encode("utf-8"), file_name="prioritized_tasks.md", mime="text/markdown")
         st.code(md, language="markdown")
 
-        # Notion export
-        if st.button("📤 Export to Notion", type="primary", disabled=not notion_ready):
-            if not HAS_NOTION:
-                st.error("Install `notion-client` first: pip install notion-client")
-            else:
-                try:
-                    client = NotionClient(auth=notion_token)
-                    created = 0
-                    for t in prioritized:
-                        client.pages.create(
-                            parent={"database_id": notion_db_id},
-                            properties={
-                                "Name": {"title": [{"text": {"content": t.text}}]},
-                                "Urgent": {"checkbox": t.urgent},
-                                "Importance": {"number": float(t.importance)},
-                                "Effort": {"number": float(t.effort)},
-                                "Energy": {"select": {"name": t.energy}},
-                                "Quadrant": {"select": {"name": t.quadrant}},
-                            }
-                        )
-                        created += 1
-                    st.success(f"Exported {created} tasks to Notion.")
-                except Exception as e:
-                    st.error(f"Notion export failed: {e}")
+        # Notion export button
+        if HAS_NOTION:
+            if st.button("📤 Export to Notion", type="primary", disabled=False):
+                # Prefer Cloud secrets, fall back to sidebar fields
+                token = st.secrets.get("NOTION_TOKEN", "") or notion_token
+                dbid  = st.secrets.get("NOTION_DB_ID", "") or notion_db_id
+                if not (token and dbid):
+                    st.error("Missing Notion token or DB ID. Add them in the sidebar or in Streamlit Secrets.")
+                else:
+                    try:
+                        client = NotionClient(auth=token)
+                        created = 0
+                        for t in prioritized:
+                            client.pages.create(
+                                parent={"database_id": dbid},
+                                properties={
+                                    "Name": {"title": [{"text": {"content": t.text}}]},
+                                    "Urgent": {"checkbox": t.urgent},
+                                    "Importance": {"number": float(t.importance)},
+                                    "Effort": {"number": float(t.effort)},
+                                    "Energy": {"select": {"name": t.energy}},
+                                    "Quadrant": {"select": {"name": t.quadrant}},
+                                }
+                            )
+                            created += 1
+                        st.success(f"Exported {created} tasks to Notion.")
+                    except Exception as e:
+                        st.error(f"Notion export failed: {e}")
+        else:
+            st.info("Install `notion-client` (already in requirements) to enable Notion export.")
+
